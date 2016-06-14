@@ -16,11 +16,6 @@ public class ServiceLauncher extends AppCompatActivity  {
 //        setContentView(R.layout.activity_hello);
         startService(new Intent(this, EncoderService.class));
         finish();
-        Toast.makeText(getBaseContext(), getMsgFromJni(), Toast.LENGTH_LONG).show();
+ //       Toast.makeText(getBaseContext(), getMsgFromJni(), Toast.LENGTH_LONG).show();
     }
-
-    static {
-        System.loadLibrary("rotary-encoder-service");
-    }
-    public static native String getMsgFromJni();
 }

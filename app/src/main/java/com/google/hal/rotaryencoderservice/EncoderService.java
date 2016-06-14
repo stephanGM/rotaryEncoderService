@@ -23,14 +23,20 @@ public class EncoderService extends Service{
     public int onStartCommand(Intent intent,int flags, int startid)
     {
 
-// This will start ServiceLauncher.java activity YET IT ALREADY STARTS (check manifest)
+// This will start ServiceLauncher.java activity
 //        Intent intents = new Intent(getBaseContext(),InterfaceLauncher.class);
 //        intents.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 //        startActivity(intents);
 
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
+        Toast.makeText(getBaseContext(), getMsgFromJni(), Toast.LENGTH_LONG).show();
         Log.d(TAG, "onStart");
         return START_STICKY;
     }
+
+    static {
+        System.loadLibrary("rotary-encoder-service");
+    }
+    public static native String getMsgFromJni();
 
 }
