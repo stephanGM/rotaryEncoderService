@@ -7,6 +7,7 @@ package com.google.hal.rotaryencoderservice;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.content.Intent;
+import android.widget.Toast;
 public class ServiceLauncher extends AppCompatActivity  {
     @Override
     public void onCreate(Bundle savedInstanceState)
@@ -15,7 +16,11 @@ public class ServiceLauncher extends AppCompatActivity  {
 //        setContentView(R.layout.activity_hello);
         startService(new Intent(this, EncoderService.class));
         finish();
-//        Toast.makeText(getBaseContext(), "Hello........", Toast.LENGTH_LONG).show();
+        Toast.makeText(getBaseContext(), getMsgFromJni(), Toast.LENGTH_LONG).show();
     }
 
+    static {
+        System.loadLibrary("rotary-encoder-service");
+    }
+    public static native String getMsgFromJni();
 }

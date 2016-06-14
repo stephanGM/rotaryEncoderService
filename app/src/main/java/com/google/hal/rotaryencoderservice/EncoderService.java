@@ -23,7 +23,7 @@ public class EncoderService extends Service{
     public int onStartCommand(Intent intent,int flags, int startid)
     {
 
-// This will start ServiceLauncher.java activity
+// This will start ServiceLauncher.java activity YET IT ALREADY STARTS (check manifest)
 //        Intent intents = new Intent(getBaseContext(),InterfaceLauncher.class);
 //        intents.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 //        startActivity(intents);
@@ -32,4 +32,5 @@ public class EncoderService extends Service{
         Log.d(TAG, "onStart");
         return START_STICKY;
     }
+
 }
