@@ -24,12 +24,13 @@ public class EncoderService extends Service{
     {
 
 // This will start ServiceLauncher.java activity
-//        Intent intents = new Intent(getBaseContext(),InterfaceLauncher.class);
+//        Intent intents = new Intent(getBaseContext(),ServiceLauncher.class);
 //        intents.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 //        startActivity(intents);
 
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
-        Toast.makeText(getBaseContext(), getMsgFromJni(), Toast.LENGTH_LONG).show();
+        String result = Integer.toString(getInterrupt(17, 22));
+        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
         Log.d(TAG, "onStart");
         return START_STICKY;
     }
@@ -37,6 +38,7 @@ public class EncoderService extends Service{
     static {
         System.loadLibrary("rotary-encoder-service");
     }
-    public static native String getMsgFromJni();
+    public static native int getInterrupt(int gpio1, int gpio2);
+
 
 }

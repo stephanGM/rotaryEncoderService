@@ -20,6 +20,7 @@ model {
         }
         ndk {
             moduleName "rotary-encoder-service"
+            ldLibs.addAll(["android", "log"])
         }
     }
 }
