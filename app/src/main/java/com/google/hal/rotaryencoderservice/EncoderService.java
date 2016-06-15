@@ -6,9 +6,12 @@ package com.google.hal.rotaryencoderservice;
 import android.app.Service;
 import android.os.IBinder;
 import android.content.Intent;
+import android.os.Process;
 import android.widget.Toast;
 import android.util.Log;
-public class EncoderService extends Service{
+
+
+public class EncoderService extends Service implements Runnable{
     private static final String TAG = "MyService";
     @Override
     public IBinder onBind(Intent intent) {
@@ -23,17 +26,25 @@ public class EncoderService extends Service{
     public int onStartCommand(Intent intent,int flags, int startid)
     {
 
-// This will start ServiceLauncher.java activity
+// This will start ServiceLauncher.java activity (they call each other so prob a bad idea)
 //        Intent intents = new Intent(getBaseContext(),ServiceLauncher.class);
 //        intents.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 //        startActivity(intents);
 
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
-        String result = Integer.toString(getInterrupt(17, 22));
-        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+        (new Thread(new EncoderService())).start();
         Log.d(TAG, "onStart");
         return START_STICKY;
     }
+
+    @Override
+    public void run() {
+        // Moves the current Thread into the foreground
+        android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+        String result = Integer.toString(getInterrupt(17, 22)); //starts thread
+        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+    }
+
 
     static {
         System.loadLibrary("rotary-encoder-service");
