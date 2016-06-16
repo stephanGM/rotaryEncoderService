@@ -1,7 +1,12 @@
 package com.google.hal.rotaryencoderservice;
 
 /**
- * Created by HAL on 16-06-14.
+ * ====================================================================
+ * ServiceAutosart.java:
+ *  Ensures that the service begins on device boot
+ * ====================================================================
+ * authors(s): Stephan Greto-McGrath
+ * ====================================================================
  */
 import android.content.Intent;
 import android.content.BroadcastReceiver;
