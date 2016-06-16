@@ -36,6 +36,8 @@ public class EncoderService extends Service implements Runnable{
 //        startActivity(intents);
 
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
+        String result = Integer.toString(getInterrupt(17, 22)); //starts thread
+        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
         (new Thread(new EncoderService())).start();
         Log.d(TAG, "onStart");
         return START_STICKY;
@@ -43,12 +45,11 @@ public class EncoderService extends Service implements Runnable{
 
     @Override
     public void run() {
-        while(true) {
-                // Moves the current Thread into the foreground
-                android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
-                String result = Integer.toString(getInterrupt(17, 22)); //starts thread
-                Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
-        }
+//        while(true) {
+//                // Moves the current Thread into the foreground
+//                android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+//
+//        }
     }
 
 

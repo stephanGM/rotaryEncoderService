@@ -90,7 +90,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
         LOGD("failed on 2nd open");
         exit(1);
     }
-    //TODO change POLLIN to POLLPRI after testing on shit device is done
+    //TODO change POLLIN to POLLPRI after testing on shitty malfunctioning device is done
     /* configure poll struct */
     pfd[0].fd = fd1;
     pfd[1].fd = fd2;
@@ -104,9 +104,9 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
 
     for (;;) {
         /* wait for interrupt */
-        poll(pfd, 2, -1);
+        poll(pfd, 2, 1000000);
         if ((pfd[0].revents & POLLIN) | (pfd[1].revents & POLLIN)) {
-            LOGD("interrupt received");
+//            LOGD("interrupt received");
             /*interrupt received */
             /* consume interrupts & read values */
             if (lseek(fd1, 0, SEEK_SET) == -1) break;
@@ -115,9 +115,9 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
             if (read(fd2, buf2, sizeof buf2) == -1) break;
             get_direction(buf1,buf2);
         }
-        LOGD("Interrupt not received");
+//        LOGD("Interrupt not received");
     }
-    LOGD("Leaving interrupt detection");
+    LOGD("Reading Terminated");
     close(fd1);
     close(fd2);
     exit(0);
@@ -138,8 +138,15 @@ void get_direction(char buf1[8], char buf2[8]){
         previousState = currentState;
         currentState = concantenate(atoi(buf1), atoi(buf2));
         //TODO call back to java here w direction
-        LOGD("direction: %d\n", fsm(currentState, previousState));
+        /* in case poll returns constantly, this statement below
+         * ensures that we only consider a change in state.
+         * Unnecessary if poll() is working properly with interrupts
+         */
+        if (previousState != currentState) {
+            LOGD("direction: %d\n", fsm(currentState, previousState));
+        }
     } else { /* just starting -> need prev state */
+        LOGD("sentinel = false");
         currentState = concantenate(atoi(buf1), atoi(buf2));
         sentinel = false;
     }
