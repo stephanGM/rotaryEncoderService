@@ -1,3 +1,29 @@
+/**
+* ====================================================================
+* rotary-encoder-service.c:
+*   Used to receive interrupts on GPIO using poll() and handle
+*   the interrupt with a finite state machine in order to
+*   determine the direction of rotation of the encoder.
+*   Each change of state triggers a call to fsm.
+*   Therefore, to use detents, place code by fsm call.
+* ====================================================================
+* IMPORTANT NOTE:
+*   This code assumes that gpio pins have been exported
+*   and their edges set like so:
+*
+*   "echo XX  >/sys/class/gpio/export"
+*   "echo in >/sys/class/gpio/gpioXX/direction"
+*   "echo both >/sys/class/gpio/gpioXX/edge"
+*
+*   "echo YY  >/sys/class/gpio/export"
+*   "echo in >/sys/class/gpio/gpioYY/direction"
+*   "echo both >/sys/class/gpio/gpioYY/edge"
+*
+* ====================================================================
+* author(s): Stephan Greto-McGrath (with a couple lines from SO)
+* ====================================================================
+*/
+
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +38,10 @@
 #else
 #define LOGD(...) printf(">==< %s >==< ",LOG_TAG),printf(__VA_ARGS__),printf("\n")
 #endif
+
+int fsm(int previousState, int currentState);
+int concantenate(int x, int y);
+void get_direction(char buf1[8], char buf2[8]);
 
 typedef enum {
     false,
@@ -29,8 +59,15 @@ bool sentinel = true;   /* indicates 1st run -> get initial (previous) state */
 int currentState;
 int previousState;
 
-
-
+/**
+* ====================================================================
+* gpio_interrupt fn:
+*   Uses poll() to wait on interrupt from gpio pins
+*   then call get_direction to determine rotation of encoder
+* ====================================================================
+* authors(s): Stephan Greto-McGrath
+* ====================================================================
+*/
 JNIEXPORT jint JNICALL
 Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env, jclass type,
                                                                      jint gpio1, jint gpio2) {
@@ -53,6 +90,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
         LOGD("failed on 2nd open");
         exit(1);
     }
+    //TODO change POLLIN to POLLPRI after testing on shit device is done
     /* configure poll struct */
     pfd[0].fd = fd1;
     pfd[1].fd = fd2;
@@ -75,6 +113,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
             if (read(fd1, buf1, sizeof buf1) == -1) break;
             if (lseek(fd2, 0, SEEK_SET) == -1) break;
             if (read(fd2, buf2, sizeof buf2) == -1) break;
+            get_direction(buf1,buf2);
         }
         LOGD("Interrupt not received");
     }
@@ -82,4 +121,128 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
     close(fd1);
     close(fd2);
     exit(0);
+}
+
+
+/**
+* ====================================================================
+* get_direction fn:
+*   assigns state based on sentinel and calls the fsm to determine
+*   direction
+* ====================================================================
+* authors(s): Stephan Greto-McGrath
+* ====================================================================
+*/
+void get_direction(char buf1[8], char buf2[8]){
+    if (sentinel != true) {  /* we already have a prev state */
+        previousState = currentState;
+        currentState = concantenate(atoi(buf1), atoi(buf2));
+        //TODO call back to java here w direction
+        LOGD("direction: %d\n", fsm(currentState, previousState));
+    } else { /* just starting -> need prev state */
+        currentState = concantenate(atoi(buf1), atoi(buf2));
+        sentinel = false;
+    }
+}
+
+
+/**
+* ====================================================================
+* fsm fn:
+*     Finite State Machine to decode the output of a
+*     rotary encoder implemented as a pulldown switch
+* ====================================================================
+* Details:
+*
+* Rotary Encoder Output: cw 1, ccw 0, invalid -1
+* How it works:
+*     CW  ---->
+*     CCW <----
+*
+*          +-----+     +-----+     +-----+
+* Ch X     |     |     |     |     |     |
+*       ---+     +-----+     +-----+     +-----
+*
+*             +-----+     +-----+     +-----+
+* Ch Y        |     |     |     |     |     |
+*       ------+     +-----+     +-----+     +-----
+*
+*       ^  ^  ^  ^  ^  ^  ^  ^  ^  ^  ^  ^  ^
+* X    0| 1| 1| 0| 0| 1| 1| 0| 0| 1| 1| 0| 0|
+* Y    0| 0| 1| 1| 0| 0| 1| 1| 0| 0| 1| 1| 0|
+*
+*     State: XY
+*     ccw  prev.  cw    ccw  prev.  cw
+*     01 <- 00 -> 10    B  <- A ->  D
+*     11 <- 01 -> 00    C  <- B ->  A
+*     10 <- 11 -> 01    D  <- C ->  B
+*     00 <- 10 -> 11    A  <- D ->  C
+*
+*     All state transitions not defined are invalid
+* ====================================================================
+* author(s):  Stephan Greto-McGrath
+* ====================================================================
+*/
+int fsm(int previousState, int currentState) {
+    int direction;
+    switch (previousState) {
+        case stateA:
+            if (currentState == stateD) {
+                direction = 1; /* cw */
+            } else if (currentState == stateB) {
+                direction = 0; /* ccw */
+            } else {
+                direction = -1; /* not a valid state */
+                sentinel = true; /* restart state machine */
+            }
+            break;
+        case stateB:
+            if (currentState == stateA) {
+                direction = 1; /* cw */
+            } else if (currentState == stateC) {
+                direction = 0; /* ccw */
+            } else {
+                direction = -1; /* not a valid state */
+                sentinel = true; /* restart state machine */
+            }
+            break;
+        case stateC:
+            if (currentState == stateB) {
+                direction = 1; /* cw */
+            } else if (currentState == stateD) {
+                direction = 0; /* ccw */
+            } else {
+                direction = -1; /* not a valid state */
+                sentinel = true; /* restart state machine */
+            }
+            break;
+        case stateD:
+            if (currentState == stateC) {
+                direction = 1; /* cw */
+            } else if (currentState == stateA) {
+                direction = 0; /* ccw */
+            } else {
+                direction = -1; /* not a valid state */
+                sentinel = true; /* restart state machine */
+            }
+            break;
+        default:
+            direction = -1; /* not a valid state */
+            sentinel = true; /* restart state machine */
+    }
+    return direction;
+}
+
+/**
+* ====================================================================
+* concantenate fn: (int x, int y) -> int xy
+* ====================================================================
+* authors(s): Tavis Bohne (http://stackoverflow.com/a/12700533/3885972)
+* ====================================================================
+*/
+int concantenate(int x, int y) {
+    int pow = 10;
+    while (y >= pow)
+        pow *= 10;
+    return x * pow + y;
 }

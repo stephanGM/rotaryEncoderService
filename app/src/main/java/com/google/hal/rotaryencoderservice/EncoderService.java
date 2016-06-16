@@ -1,7 +1,13 @@
 package com.google.hal.rotaryencoderservice;
 
 /**
- * Created by HAL on 16-06-14.
+ * ====================================================================
+ * EncoderService.java:
+ *  Service runs on boot or can be started from ServiceLauncher.java
+ *  onStartCommand initiates rotary-encoder-service.c
+ * ====================================================================
+ * authors(s): Stephan Greto-McGrath
+ * ====================================================================
  */
 import android.app.Service;
 import android.os.IBinder;
@@ -9,10 +15,8 @@ import android.content.Intent;
 import android.os.Process;
 import android.widget.Toast;
 import android.util.Log;
-
-
 public class EncoderService extends Service implements Runnable{
-    private static final String TAG = "MyService";
+    private static final String TAG = "EncoderService";
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -39,10 +43,12 @@ public class EncoderService extends Service implements Runnable{
 
     @Override
     public void run() {
-        // Moves the current Thread into the foreground
-        android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
-        String result = Integer.toString(getInterrupt(17, 22)); //starts thread
-        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+        while(true) {
+                // Moves the current Thread into the foreground
+                android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
+                String result = Integer.toString(getInterrupt(17, 22)); //starts thread
+                Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
+        }
     }
 
 
