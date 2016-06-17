@@ -41,7 +41,8 @@
 
 int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
-void get_direction(char buf1[8], char buf2[8]);
+void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
+void test(JNIEnv *env, jclass type);
 
 typedef enum {
     false,
@@ -72,7 +73,10 @@ JNIEXPORT jint JNICALL
 Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env, jclass type,
                                                                      jint gpio1, jint gpio2) {
 
+
     LOGD("function begins");
+    jmethodID mid = (*env)->GetStaticMethodID(env, type, "handleStateChange", "(I)V");
+//    test(env,type);
     gpio1 = (int) gpio1;
     gpio2 = (int) gpio2;
     struct pollfd pfd[2];
@@ -113,7 +117,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
             if (read(fd1, buf1, sizeof buf1) == -1) break;
             if (lseek(fd2, 0, SEEK_SET) == -1) break;
             if (read(fd2, buf2, sizeof buf2) == -1) break;
-            get_direction(buf1,buf2);
+            get_direction(buf1,buf2,env,type,mid);
         }
 //        LOGD("Interrupt not received");
     }
@@ -127,13 +131,13 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
 /**
 * ====================================================================
 * get_direction fn:
-*   assigns state based on sentinel and calls the fsm to determine
+*   assigns state based on sentinel var and calls the fsm to determine
 *   direction
 * ====================================================================
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
-void get_direction(char buf1[8], char buf2[8]){
+void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type, jmethodID mid){
     if (sentinel != true) {  /* we already have a prev state */
         previousState = currentState;
         currentState = concantenate(atoi(buf1), atoi(buf2));
@@ -144,6 +148,8 @@ void get_direction(char buf1[8], char buf2[8]){
          */
         if (previousState != currentState) {
             LOGD("direction: %d\n", fsm(currentState, previousState));
+            (*env)->CallStaticVoidMethod(env, type, mid, (jint)10); /* call back to java */
+                                                                    /* act on state change */
         }
     } else { /* just starting -> need prev state */
         LOGD("sentinel = false");
@@ -252,4 +258,10 @@ int concantenate(int x, int y) {
     while (y >= pow)
         pow *= 10;
     return x * pow + y;
+}
+
+
+void test(JNIEnv *env, jclass type){
+    jmethodID mid = (*env)->GetStaticMethodID(env, type, "handleStateChange", "(I)V");
+    (*env)->CallStaticVoidMethod(env, type, mid, (jint)10);
 }

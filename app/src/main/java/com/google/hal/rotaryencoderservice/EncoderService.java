@@ -15,7 +15,7 @@ import android.content.Intent;
 import android.os.Process;
 import android.widget.Toast;
 import android.util.Log;
-public class EncoderService extends Service implements Runnable{
+public class EncoderService extends Service{
     private static final String TAG = "EncoderService";
     @Override
     public IBinder onBind(Intent intent) {
@@ -29,29 +29,18 @@ public class EncoderService extends Service implements Runnable{
     @Override
     public int onStartCommand(Intent intent,int flags, int startid)
     {
-
-// This will start ServiceLauncher.java activity (they call each other so prob a bad idea)
-//        Intent intents = new Intent(getBaseContext(),ServiceLauncher.class);
-//        intents.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//        startActivity(intents);
-
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
-        String result = Integer.toString(getInterrupt(17, 22)); //starts thread
-        Toast.makeText(getBaseContext(), result, Toast.LENGTH_LONG).show();
-        (new Thread(new EncoderService())).start();
         Log.d(TAG, "onStart");
+        getInterrupt(17, 22);
         return START_STICKY;
     }
 
-    @Override
-    public void run() {
-//        while(true) {
-//                // Moves the current Thread into the foreground
-//                android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_FOREGROUND);
-//
-//        }
+
+    public static void handleStateChange(int direction){
+        Log.d(TAG,"handled rn");
     }
 
+    //TODO write a scorll simulation method
 
     static {
         System.loadLibrary("rotary-encoder-service");
