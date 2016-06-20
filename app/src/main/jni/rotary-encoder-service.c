@@ -5,7 +5,7 @@
 *   the interrupt with a finite state machine in order to
 *   determine the direction of rotation of the encoder.
 *   Each change of state triggers a call to fsm.
-*   Therefore, to use detents, place code by fsm call.
+*   Therefore, to use detents, place desired fn call by fsm call.
 * ====================================================================
 * IMPORTANT NOTE:
 *   This code assumes that gpio pins have been exported
@@ -43,6 +43,7 @@ int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
 void test(JNIEnv *env, jclass type);
+void routine(int gpio1, int gpio2);
 
 typedef enum {
     false,
@@ -69,16 +70,48 @@ int previousState;
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
+static JavaVM *jvm;
+
 JNIEXPORT jint JNICALL
-Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env, jclass type,
+Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type,
                                                                      jint gpio1, jint gpio2) {
 
-
     LOGD("function begins");
-    jmethodID mid = (*env)->GetStaticMethodID(env, type, "handleStateChange", "(I)V");
-//    test(env,type);
+    /*cache JVM*/
+    int status = (*env)->GetJavaVM(env, &jvm);
+    if (status != 0) {
+        LOGD("failed to retrieve *env");
+        exit(1);
+    }
     gpio1 = (int) gpio1;
     gpio2 = (int) gpio2;
+    routine(gpio1,gpio2);
+}
+
+
+/**
+* ====================================================================
+* routine fn:
+*   Configures poll(), sets up infinite loop to run on new thread
+*   in jvm and then uses poll() to determine if a change has
+*   taken place on a gpio pin. If it has, it calls get_direction
+*   to determine which way the encoder was turned.
+* ====================================================================
+* authors(s): Stephan Greto-McGrath
+* ====================================================================
+*/
+ void routine(int gpio1, int gpio2){
+     /* get a new environment and attach a new thread */
+     JNIEnv* newEnv;
+     JavaVMAttachArgs args;
+     args.version = JNI_VERSION_1_6; // choose your JNI version
+     args.name = NULL; // if you want to give the java thread a name
+     args.group = NULL; // you can assign the java thread to a ThreadGroup
+     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
+     jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
+     jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
+
+
     struct pollfd pfd[2];
     int fd1, fd2;
     char str1[256], str2[256];
@@ -117,11 +150,12 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
             if (read(fd1, buf1, sizeof buf1) == -1) break;
             if (lseek(fd2, 0, SEEK_SET) == -1) break;
             if (read(fd2, buf2, sizeof buf2) == -1) break;
-            get_direction(buf1,buf2,env,type,mid);
+            get_direction(buf1,buf2,newEnv,cls,mid);
         }
 //        LOGD("Interrupt not received");
     }
     LOGD("Reading Terminated");
+     (*jvm)->DetachCurrentThread(jvm);
     close(fd1);
     close(fd2);
     exit(0);
@@ -137,18 +171,17 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_getInterrupt(JNIEnv *env
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
-void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type, jmethodID mid){
+void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmethodID mid){
     if (sentinel != true) {  /* we already have a prev state */
         previousState = currentState;
         currentState = concantenate(atoi(buf1), atoi(buf2));
-        //TODO call back to java here w direction
         /* in case poll returns constantly, this statement below
          * ensures that we only consider a change in state.
          * Unnecessary if poll() is working properly with interrupts
          */
         if (previousState != currentState) {
             LOGD("direction: %d\n", fsm(currentState, previousState));
-            (*env)->CallStaticVoidMethod(env, type, mid, (jint)10); /* call back to java */
+            (*newEnv)->CallStaticVoidMethod(newEnv, cls, mid, (jint)10); /* call back to java */
                                                                     /* act on state change */
         }
     } else { /* just starting -> need prev state */
@@ -260,8 +293,3 @@ int concantenate(int x, int y) {
     return x * pow + y;
 }
 
-
-void test(JNIEnv *env, jclass type){
-    jmethodID mid = (*env)->GetStaticMethodID(env, type, "handleStateChange", "(I)V");
-    (*env)->CallStaticVoidMethod(env, type, mid, (jint)10);
-}

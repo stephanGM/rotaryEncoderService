@@ -31,7 +31,7 @@ public class EncoderService extends Service{
     {
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_LONG).show();
         Log.d(TAG, "onStart");
-        getInterrupt(17, 22);
+        startRoutine(17, 22);
         return START_STICKY;
     }
 
@@ -45,7 +45,7 @@ public class EncoderService extends Service{
     static {
         System.loadLibrary("rotary-encoder-service");
     }
-    public static native int getInterrupt(int gpio1, int gpio2);
+    public static native int startRoutine(int gpio1, int gpio2);
 
 
 }
