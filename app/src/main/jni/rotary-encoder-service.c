@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <pthread.h>
 #include <unistd.h>
 
 #include <android/log.h>
@@ -43,7 +44,7 @@ int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
 void test(JNIEnv *env, jclass type);
-void routine(int gpio1, int gpio2);
+void *routine(void *gpios);
 
 typedef enum {
     false,
@@ -61,6 +62,13 @@ bool sentinel = true;   /* indicates 1st run -> get initial (previous) state */
 int currentState;
 int previousState;
 
+/* define arguments to pass to the thread */
+struct thread_data{
+    int gpio1;
+    int gpio2;
+};
+
+//TODO re-comment this section
 /**
 * ====================================================================
 * gpio_interrupt fn:
@@ -77,15 +85,28 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
                                                                      jint gpio1, jint gpio2) {
 
     LOGD("function begins");
-    /*cache JVM*/
+//    jclass classClass = (*env)->GetObjectClass(env,type);
+    /* cache JVM to attach native thread */
     int status = (*env)->GetJavaVM(env, &jvm);
     if (status != 0) {
         LOGD("failed to retrieve *env");
         exit(1);
     }
-    gpio1 = (int) gpio1;
-    gpio2 = (int) gpio2;
-    routine(gpio1,gpio2);
+
+
+//    gpio1 = (int) gpio1;
+//    gpio2 = (int) gpio2;
+
+    struct thread_data gpios;
+    gpios.gpio1 = (int) gpio1; /* set them as the given gpio numbers */
+    gpios.gpio2 = (int) gpio2;
+    pthread_t routine_thread; /*create routine thread */
+    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
+        LOGD("Error creating thread");
+        exit(1);
+    }
+    pthread_exit(NULL);
+//    routine(&gpios);
 }
 
 
@@ -100,16 +121,23 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
- void routine(int gpio1, int gpio2){
-     /* get a new environment and attach a new thread */
-     JNIEnv* newEnv;
-     JavaVMAttachArgs args;
-     args.version = JNI_VERSION_1_6; // choose your JNI version
-     args.name = NULL; // if you want to give the java thread a name
-     args.group = NULL; // you can assign the java thread to a ThreadGroup
-     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
-     jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
-     jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
+ void *routine(void *gpios){
+
+    /* get variable from struct passed to this thread */
+    struct thread_data *my_gpios;
+    my_gpios = (struct thread_data *) gpios;
+    int gpio1 = my_gpios->gpio1;
+    int gpio2 = my_gpios->gpio2;
+
+    /* get a new environment and attach this new thread to jvm */
+    JNIEnv* newEnv;
+    JavaVMAttachArgs args;
+    args.version = JNI_VERSION_1_6; // choose your JNI version
+    args.name = NULL; // if you want to give the java thread a name
+    args.group = NULL; // you can assign the java thread to a ThreadGroup
+    (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
+    jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
+    jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
 
 
     struct pollfd pfd[2];
@@ -175,7 +203,7 @@ void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmeth
     if (sentinel != true) {  /* we already have a prev state */
         previousState = currentState;
         currentState = concantenate(atoi(buf1), atoi(buf2));
-        /* in case poll returns constantly, this statement below
+        /* In case poll returns constantly, this statement below
          * ensures that we only consider a change in state.
          * Unnecessary if poll() is working properly with interrupts
          */
