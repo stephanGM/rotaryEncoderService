@@ -43,7 +43,6 @@
 int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
-void test(JNIEnv *env, jclass type);
 void *routine(void *gpios);
 
 typedef enum {
@@ -79,23 +78,32 @@ struct thread_data{
 * ====================================================================
 */
 static JavaVM *jvm;
+static jclass cls;
+//static jobject gClassLoader;
+//static jmethodID gFindClassMethod;
 
 JNIEXPORT jint JNICALL
 Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type,
                                                                      jint gpio1, jint gpio2) {
 
     LOGD("function begins");
-//    jclass classClass = (*env)->GetObjectClass(env,type);
     /* cache JVM to attach native thread */
     int status = (*env)->GetJavaVM(env, &jvm);
     if (status != 0) {
         LOGD("failed to retrieve *env");
         exit(1);
     }
+//    jclass tmp = (*env)->FindClass(env,"com/google/hal/rotaryencoderservice/EncoderService");
+    cls = (jclass)(*env)->NewGlobalRef(env,type);
 
+//    jclass desiredClass = (*env)->FindClass(env,"com/google/hal/rotaryencoderservice/EncoderService");
+//    jclass classClass = (*env)->GetObjectClass(env,type);
+//    jclass classLoaderClass = (*env)->FindClass(env,"java/lang/ClassLoader");
+//    jmethodID getClassLoaderMethod = (*env)->GetMethodID(env,classClass,"getClassLoader","()Ljava/lang/ClassLoader;");
+//    gClassLoader = (*env)->CallObjectMethod(env,desiredClass, getClassLoaderMethod);
+//    gFindClassMethod = (*env)->GetMethodID(env,classLoaderClass, "findClass",
+//                                        "(Ljava/lang/String;)Ljava/lang/Class;");
 
-//    gpio1 = (int) gpio1;
-//    gpio2 = (int) gpio2;
 
     struct thread_data gpios;
     gpios.gpio1 = (int) gpio1; /* set them as the given gpio numbers */
@@ -105,7 +113,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         LOGD("Error creating thread");
         exit(1);
     }
-    pthread_exit(NULL);
 //    routine(&gpios);
 }
 
@@ -126,8 +133,12 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     /* get variable from struct passed to this thread */
     struct thread_data *my_gpios;
     my_gpios = (struct thread_data *) gpios;
-    int gpio1 = my_gpios->gpio1;
-    int gpio2 = my_gpios->gpio2;
+//    int gpio1 = my_gpios->gpio1;
+//    int gpio2 = my_gpios->gpio2;
+    int gpio1 = 17;
+    int gpio2 = 22;
+    LOGD("gpio1:%d",gpio1);
+    LOGD("gpio2:%d",gpio1);
 
     /* get a new environment and attach this new thread to jvm */
     JNIEnv* newEnv;
@@ -136,7 +147,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     args.name = NULL; // if you want to give the java thread a name
     args.group = NULL; // you can assign the java thread to a ThreadGroup
     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
-    jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
+//    jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
     jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
 
 
@@ -183,10 +194,10 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 //        LOGD("Interrupt not received");
     }
     LOGD("Reading Terminated");
-     (*jvm)->DetachCurrentThread(jvm);
     close(fd1);
     close(fd2);
-    exit(0);
+     (*jvm)->DetachCurrentThread(jvm);
+    pthread_exit(NULL);
 }
 
 
@@ -211,6 +222,7 @@ void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmeth
             LOGD("direction: %d\n", fsm(currentState, previousState));
             (*newEnv)->CallStaticVoidMethod(newEnv, cls, mid, (jint)10); /* call back to java */
                                                                     /* act on state change */
+            LOGD("JNI call made");
         }
     } else { /* just starting -> need prev state */
         LOGD("sentinel = false");
@@ -320,4 +332,5 @@ int concantenate(int x, int y) {
         pow *= 10;
     return x * pow + y;
 }
+
 
