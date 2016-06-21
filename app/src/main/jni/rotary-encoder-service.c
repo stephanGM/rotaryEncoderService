@@ -41,6 +41,9 @@ int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
 void *routine(void *gpios);
+void setup_gpios(int gpio1, int gpio2);
+static int gpio_export(int pin);
+static int set_edge(int pin, int edge);
 typedef enum {
     false,
     true
@@ -78,22 +81,25 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
                                                                      jint gpio1, jint gpio2) {
 
     LOGD("function begins");
+    gpio1 = (int) gpio1;
+    gpio2 = (int) gpio2;
+    setup_gpios(gpio1, gpio2);
     /* cache JVM to attach native thread */
-    int status = (*env)->GetJavaVM(env, &jvm);
-    if (status != 0) {
-        LOGD("failed to retrieve *env");
-        exit(1);
-    }
-    /* cls is made a global to be used in the spawned thread*/
-    cls = (jclass)(*env)->NewGlobalRef(env,type);
-    struct thread_data gpios;  /* */
-    gpios.gpio1 = (int) gpio1; /* set them as the given gpio numbers */
-    gpios.gpio2 = (int) gpio2;
-    pthread_t routine_thread; /*create routine thread */
-    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
-        LOGD("Error creating thread");
-        exit(1);
-    }
+//    int status = (*env)->GetJavaVM(env, &jvm);
+//    if (status != 0) {
+//        LOGD("failed to retrieve *env");
+//        exit(1);
+//    }
+//    /* cls is made a global to be used in the spawned thread*/
+//    cls = (jclass)(*env)->NewGlobalRef(env,type);
+//    struct thread_data gpios;  /* */
+//    gpios.gpio1 = gpio1; /* set them as the given gpio numbers */
+//    gpios.gpio2 = gpio2;
+//    pthread_t routine_thread; /*create routine thread */
+//    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
+//        LOGD("Error creating thread");
+//        exit(1);
+//    }
 }
 
 /**
@@ -293,6 +299,75 @@ int fsm(int previousState, int currentState) {
             sentinel = true; /* restart state machine */
     }
     return direction;
+}
+
+
+void setup_gpios(int gpio1, int gpio2){
+    gpio_export(gpio1);
+    gpio_export(gpio2);
+    set_edge(gpio1,3);
+    set_edge(gpio2,3);
+}
+
+static int gpio_export(int pin){
+    int fd;
+    char buffer[3];
+    if ((fd = open("/sys/class/gpio/export", O_WRONLY) <0)){
+        LOGD("open during gpio export failed");
+        return(-1);
+    }
+    snprintf(buffer, 3, "%d", pin);
+    if(write(fd, buffer, 3*sizeof(char))<0){
+        LOGD("write during gpio export failed");
+        return(-1);
+    }
+    close(fd);
+    return(0);
+}
+
+/**
+* ====================================================================
+* set_edge fn: sets the edge of a given gpio pin
+* ====================================================================
+* Details:
+*   sets edge as either rising (edge = 1), falling (edge = 2) or both
+*   (edge = 3) on gpio of number pin
+* ====================================================================
+* authors(s): Stephan Greto-McGrath
+* ====================================================================
+*/
+static int set_edge(int pin, int edge){
+    int fd;
+    char str[35];
+    sprintf(str, "/sys/class/gpio/gpio%d/edge", pin);
+    if ((fd = open(str, O_WRONLY)) <0){
+        LOGD("open during set_edge failed");
+        return(-1);
+    }
+    switch (edge) {
+        case (1):
+            if(write(fd, "rising", 6*sizeof(char))<0){
+                LOGD("write during gpio export failed");
+                return(-1);
+            }
+        case (2):
+            if(write(fd, "falling", 7*sizeof(char))<0){
+                LOGD("write during gpio export failed");
+                return(-1);
+            }
+        case (3):
+            if(write(fd, "both", 4*sizeof(char))<0){
+                LOGD("write during gpio export failed");
+                return(-1);
+            }
+        default:
+            if(write(fd, "both", 4*sizeof(char))<0){
+                LOGD("write during gpio export failed");
+                return(-1);
+            }
+    }
+    close(fd);
+    return(0);
 }
 
 /**
