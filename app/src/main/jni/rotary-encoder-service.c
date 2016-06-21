@@ -23,7 +23,6 @@
 * author(s): Stephan Greto-McGrath (with a couple lines from SO)
 * ====================================================================
 */
-
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,7 +30,6 @@
 #include <poll.h>
 #include <pthread.h>
 #include <unistd.h>
-
 #include <android/log.h>
 #define LOG_TAG "GPIO"
 #ifndef EXEC
@@ -39,17 +37,14 @@
 #else
 #define LOGD(...) printf(">==< %s >==< ",LOG_TAG),printf(__VA_ARGS__),printf("\n")
 #endif
-
 int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
 void *routine(void *gpios);
-
 typedef enum {
     false,
     true
-}
-        bool;
+}bool;
 enum {
     stateA = 00,
     stateB = 01,
@@ -60,28 +55,24 @@ bool sentinel = true;   /* indicates 1st run -> get initial (previous) state */
                         /* if state is invalid sentinel = true i.e restart */
 int currentState;
 int previousState;
-
 /* define arguments to pass to the thread */
 struct thread_data{
     int gpio1;
     int gpio2;
 };
-
-//TODO re-comment this section
+/* cache jvm stuff to be used in thread */
+static JavaVM *jvm;
+static jclass cls;
 /**
 * ====================================================================
-* gpio_interrupt fn:
-*   Uses poll() to wait on interrupt from gpio pins
-*   then call get_direction to determine rotation of encoder
+* startRoutine fn:
+*   Called by Java to begin routine. Caches JVM to be used later in
+*   the pthread that it spawns. FindClass() has trouble in new thread,
+*   therefore class is also cached and made a global ref.
 * ====================================================================
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
-static JavaVM *jvm;
-static jclass cls;
-//static jobject gClassLoader;
-//static jmethodID gFindClassMethod;
-
 JNIEXPORT jint JNICALL
 Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type,
                                                                      jint gpio1, jint gpio2) {
@@ -93,19 +84,9 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         LOGD("failed to retrieve *env");
         exit(1);
     }
-//    jclass tmp = (*env)->FindClass(env,"com/google/hal/rotaryencoderservice/EncoderService");
+    /* cls is made a global to be used in the spawned thread*/
     cls = (jclass)(*env)->NewGlobalRef(env,type);
-
-//    jclass desiredClass = (*env)->FindClass(env,"com/google/hal/rotaryencoderservice/EncoderService");
-//    jclass classClass = (*env)->GetObjectClass(env,type);
-//    jclass classLoaderClass = (*env)->FindClass(env,"java/lang/ClassLoader");
-//    jmethodID getClassLoaderMethod = (*env)->GetMethodID(env,classClass,"getClassLoader","()Ljava/lang/ClassLoader;");
-//    gClassLoader = (*env)->CallObjectMethod(env,desiredClass, getClassLoaderMethod);
-//    gFindClassMethod = (*env)->GetMethodID(env,classLoaderClass, "findClass",
-//                                        "(Ljava/lang/String;)Ljava/lang/Class;");
-
-
-    struct thread_data gpios;
+    struct thread_data gpios;  /* */
     gpios.gpio1 = (int) gpio1; /* set them as the given gpio numbers */
     gpios.gpio2 = (int) gpio2;
     pthread_t routine_thread; /*create routine thread */
@@ -113,9 +94,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         LOGD("Error creating thread");
         exit(1);
     }
-//    routine(&gpios);
 }
-
 
 /**
 * ====================================================================
@@ -133,30 +112,28 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     /* get variable from struct passed to this thread */
     struct thread_data *my_gpios;
     my_gpios = (struct thread_data *) gpios;
-//    int gpio1 = my_gpios->gpio1;
-//    int gpio2 = my_gpios->gpio2;
+    //TODO fix this passing of gpio #s so I don't need to hard code them
     int gpio1 = 17;
     int gpio2 = 22;
-    LOGD("gpio1:%d",gpio1);
-    LOGD("gpio2:%d",gpio1);
 
     /* get a new environment and attach this new thread to jvm */
     JNIEnv* newEnv;
     JavaVMAttachArgs args;
-    args.version = JNI_VERSION_1_6; // choose your JNI version
-    args.name = NULL; // if you want to give the java thread a name
-    args.group = NULL; // you can assign the java thread to a ThreadGroup
+    args.version = JNI_VERSION_1_6; /* JNI version */
+    args.name = NULL; /* thread name */
+    args.group = NULL; /* thread group */
     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
-//    jclass cls = (*newEnv)->FindClass(newEnv,"com/google/hal/rotaryencoderservice/EncoderService");
+    /* get method ID to call back to Java */
     jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
 
-
+    /* initialization of vars */
     struct pollfd pfd[2];
     int fd1, fd2;
     char str1[256], str2[256];
     char buf1[8], buf2[8];
     sprintf(str1, "/sys/class/gpio/gpio%d/value", gpio1);
     sprintf(str2, "/sys/class/gpio/gpio%d/value", gpio2);
+
     /* open file descriptors */
     if ((fd1 = open(str1, O_RDONLY)) < 0) {
         LOGD("failed on 1st open");
@@ -193,13 +170,13 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         }
 //        LOGD("Interrupt not received");
     }
+    /* shutdown */
     LOGD("Reading Terminated");
     close(fd1);
     close(fd2);
-     (*jvm)->DetachCurrentThread(jvm);
+    (*jvm)->DetachCurrentThread(jvm);
     pthread_exit(NULL);
 }
-
 
 /**
 * ====================================================================
@@ -230,7 +207,6 @@ void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmeth
         sentinel = false;
     }
 }
-
 
 /**
 * ====================================================================
