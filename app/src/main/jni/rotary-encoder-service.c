@@ -1,3 +1,5 @@
+//TODO check to see app isnt uninstalled on device shutdown
+//TODO check permission for startup
 /**
 * ====================================================================
 * rotary-encoder-service.c:
@@ -23,6 +25,9 @@
 * author(s): Stephan Greto-McGrath (with a couple lines from SO)
 * ====================================================================
 */
+
+
+#include <errno.h>
 #include <jni.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,23 +88,24 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     LOGD("function begins");
     gpio1 = (int) gpio1;
     gpio2 = (int) gpio2;
-    setup_gpios(gpio1, gpio2);
+// TODO get system priviledges so it can set itself up
+//    setup_gpios(gpio1, gpio2);
     /* cache JVM to attach native thread */
-//    int status = (*env)->GetJavaVM(env, &jvm);
-//    if (status != 0) {
-//        LOGD("failed to retrieve *env");
-//        exit(1);
-//    }
-//    /* cls is made a global to be used in the spawned thread*/
-//    cls = (jclass)(*env)->NewGlobalRef(env,type);
-//    struct thread_data gpios;  /* */
-//    gpios.gpio1 = gpio1; /* set them as the given gpio numbers */
-//    gpios.gpio2 = gpio2;
-//    pthread_t routine_thread; /*create routine thread */
-//    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
-//        LOGD("Error creating thread");
-//        exit(1);
-//    }
+    int status = (*env)->GetJavaVM(env, &jvm);
+    if (status != 0) {
+        LOGD("failed to retrieve *env");
+        exit(1);
+    }
+    /* cls is made a global to be used in the spawned thread*/
+    cls = (jclass)(*env)->NewGlobalRef(env,type);
+    struct thread_data gpios;  /* */
+    gpios.gpio1 = gpio1; /* set them as the given gpio numbers */
+    gpios.gpio2 = gpio2;
+    pthread_t routine_thread; /*create routine thread */
+    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
+        LOGD("Error creating thread");
+        exit(1);
+    }
 }
 
 /**
@@ -301,7 +307,14 @@ int fsm(int previousState, int currentState) {
     return direction;
 }
 
-
+/**
+ * ====================================================================
+ * setup_gpios fn: calls fns that export the desired gpios and sets
+ *  their edges
+ * ====================================================================
+ * author(s): Stephan Greto-McGrath
+ * ====================================================================
+ */
 void setup_gpios(int gpio1, int gpio2){
     gpio_export(gpio1);
     gpio_export(gpio2);
@@ -309,11 +322,19 @@ void setup_gpios(int gpio1, int gpio2){
     set_edge(gpio2,3);
 }
 
+/**
+ * ====================================================================
+ * setup_gpios fn: exports gpio XX where int pin = XX
+ * ====================================================================
+ * author(s): Stephan Greto-McGrath
+ * ====================================================================
+ */
 static int gpio_export(int pin){
     int fd;
     char buffer[3];
-    if ((fd = open("/sys/class/gpio/export", O_WRONLY) <0)){
-        LOGD("open during gpio export failed");
+    fd = open("/sys/class/gpio/export", O_WRONLY);
+    if(fd == -1){
+        LOGD("Error! %s\n", strerror(errno));
         return(-1);
     }
     snprintf(buffer, 3, "%d", pin);
@@ -342,6 +363,7 @@ static int set_edge(int pin, int edge){
     sprintf(str, "/sys/class/gpio/gpio%d/edge", pin);
     if ((fd = open(str, O_WRONLY)) <0){
         LOGD("open during set_edge failed");
+        LOGD("Error! %s\n", strerror(errno));
         return(-1);
     }
     switch (edge) {
