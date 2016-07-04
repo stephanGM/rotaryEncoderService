@@ -25,8 +25,6 @@
 * author(s): Stephan Greto-McGrath (with a couple lines from SO)
 * ====================================================================
 */
-
-
 #include <errno.h>
 #include <jni.h>
 #include <stdio.h>
@@ -44,7 +42,7 @@
 #endif
 int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
-void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jclass type,jmethodID mid);
+void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jobject obj,jmethodID mid);
 void *routine(void *gpios);
 void setup_gpios(int gpio1, int gpio2);
 static int gpio_export(int pin);
@@ -88,8 +86,21 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     LOGD("function begins");
     gpio1 = (int) gpio1;
     gpio2 = (int) gpio2;
+
+// TODO use this to test passing terminal commands
+//    FILE *fp = popen("su -c echo 17 > /sys/class/gpio/export", "r");
+//    FILE *fp = popen("\"id\"", "r");
+//    char buf[256];
+//    while (fgets(buf, sizeof(buf), fp) != 0) {
+//    }
+//    LOGD("%s", buf);
+//    pclose(fp);
+//    LOGD("closed");
+
+
 // TODO get system priviledges so it can set itself up
 //    setup_gpios(gpio1, gpio2);
+
     /* cache JVM to attach native thread */
     int status = (*env)->GetJavaVM(env, &jvm);
     if (status != 0) {
@@ -136,7 +147,9 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     args.group = NULL; /* thread group */
     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
     /* get method ID to call back to Java */
-    jmethodID mid = (*newEnv)->GetStaticMethodID(newEnv, cls, "handleStateChange", "(I)V");
+    jmethodID mid = (*newEnv)->GetMethodID(newEnv, cls, "handleStateChange", "(I)V");
+    jobject obj = (*newEnv)->NewObject(newEnv, cls, mid,(jint)1);
+
 
     /* initialization of vars */
     struct pollfd pfd[2];
@@ -178,7 +191,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
             if (read(fd1, buf1, sizeof buf1) == -1) break;
             if (lseek(fd2, 0, SEEK_SET) == -1) break;
             if (read(fd2, buf2, sizeof buf2) == -1) break;
-            get_direction(buf1,buf2,newEnv,cls,mid);
+            get_direction(buf1,buf2,newEnv,obj,mid);
         }
 //        LOGD("Interrupt not received");
     }
@@ -199,7 +212,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
-void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmethodID mid){
+void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jobject obj, jmethodID mid){
     if (sentinel != true) {  /* we already have a prev state */
         previousState = currentState;
         currentState = concantenate(atoi(buf1), atoi(buf2));
@@ -208,13 +221,13 @@ void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jclass cls, jmeth
          * Unnecessary if poll() is working properly with interrupts
          */
         if (previousState != currentState) {
-            LOGD("direction: %d\n", fsm(currentState, previousState));
-            (*newEnv)->CallStaticVoidMethod(newEnv, cls, mid, (jint)10); /* call back to java */
+            int direction = fsm(currentState, previousState);
+            LOGD("direction: %d\n", direction);
+            (*newEnv)->CallVoidMethod(newEnv, obj, mid, (jint)direction); /* call back to java */
                                                                     /* act on state change */
-            LOGD("JNI call made");
         }
     } else { /* just starting -> need prev state */
-        LOGD("sentinel = false");
+
         currentState = concantenate(atoi(buf1), atoi(buf2));
         sentinel = false;
     }
@@ -396,7 +409,7 @@ static int set_edge(int pin, int edge){
 * ====================================================================
 * concantenate fn: (int x, int y) -> int xy
 * ====================================================================
-* authors(s): Tavis Bohne (http://stackoverflow.com/a/12700533/3885972)
+* authors(s): Tavis Bohne (stackoverflow.com/a/12700533/3885972)
 * ====================================================================
 */
 int concantenate(int x, int y) {
