@@ -16,15 +16,13 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.IBinder;
 import android.content.Intent;
-import android.os.Looper;
 import android.widget.Toast;
 import android.util.Log;
 
 public class EncoderService extends Service{
 
-    public EncoderService(){
 
-    }
+    private static Context MyContext; /* get context to use when displaying toast from JNI*/
     private static final String TAG = "EncoderService";
 
     @Override
@@ -39,23 +37,24 @@ public class EncoderService extends Service{
     @Override
     public int onStartCommand(Intent intent,int flags, int startid)
     {
+        MyContext = getApplicationContext();
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onStart");
-
         startRoutine(17, 22);
         return START_STICKY;
     }
 
-    public void showToast(final String sText){
-        final Context MyContext = this;
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override public void run(){
-                Boast boast1 = Boast.makeText(MyContext, sText, Toast.LENGTH_SHORT);
+
+    public void showToast(final String msg) {
+        Handler h = new Handler(MyContext.getMainLooper());
+        h.post(new Runnable() {
+            @Override
+            public void run() {
+                Boast boast1 = Boast.makeText(MyContext, msg, Toast.LENGTH_SHORT);
                 boast1.show();
             }
         });
-    };
-
+    }
     public void handleStateChange(int direction){
         String direc;
         if (direction == 0){
@@ -65,9 +64,8 @@ public class EncoderService extends Service{
         }else{
             direc = "invalid";
         }
-//        final Context MyContext = this;
-//        Toast boast1 = Toast.makeText(MyContext, direc, Toast.LENGTH_SHORT);
-//        boast1.show();
+        showToast(direc);
+//        Toast.makeText(this,"testing", Toast.LENGTH_SHORT);
         Log.d(TAG, direc);
     }
 
