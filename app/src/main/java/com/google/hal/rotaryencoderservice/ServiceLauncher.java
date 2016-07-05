@@ -20,7 +20,7 @@ public class ServiceLauncher extends AppCompatActivity  {
     public void onCreate(Bundle savedInstanceState)
     {
         Log.d(TAG,"manual start");
-        Toast.makeText(getBaseContext(), "Service manually initiated", Toast.LENGTH_LONG).show();
+        Toast.makeText(getBaseContext(), "Service manually initiated", Toast.LENGTH_SHORT).show();
         super.onCreate(savedInstanceState);
         startService(new Intent(this, EncoderService.class));
         finish();
