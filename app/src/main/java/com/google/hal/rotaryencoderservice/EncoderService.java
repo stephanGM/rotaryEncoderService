@@ -38,7 +38,7 @@ public class EncoderService extends Service{
         MyContext = getApplicationContext(); /* get the context to use later from JNI */
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onStart");
-        startRoutine(17, 22); /* call the C fn that begins the ISR thread */
+        startRoutine(); /* call the C fn that begins the ISR thread w desired gpio pin #s */
         return START_STICKY;
     }
 
@@ -95,6 +95,6 @@ public class EncoderService extends Service{
         System.loadLibrary("rotary-encoder-service");
     }
     /* expose the C function to be called through JNI */
-    public static native int startRoutine(int gpio1, int gpio2);
+    public static native int startRoutine();
 
 }

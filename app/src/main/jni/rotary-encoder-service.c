@@ -40,11 +40,16 @@
 #else
 #define LOGD(...) printf(">==< %s >==< ",LOG_TAG),printf(__VA_ARGS__),printf("\n")
 #endif
+
+/* define the GPIO pins to be used!!!! */
+static const int gpio1 = 17;
+static const int gpio2 = 22;
+
 int fsm(int previousState, int currentState);
 int concantenate(int x, int y);
 void get_direction(char buf1[8], char buf2[8], JNIEnv *env, jobject obj,jmethodID mid);
-void *routine(void *gpios);
-void setup_gpios(int gpio1, int gpio2);
+void *routine();
+void setup_gpios();
 static int gpio_export(int pin);
 static int set_edge(int pin, int edge);
 typedef enum {
@@ -80,23 +85,9 @@ static jclass cls;
 * ====================================================================
 */
 JNIEXPORT jint JNICALL
-Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type,
-                                                                     jint gpio1, jint gpio2) {
+Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type) {
 
     LOGD("function begins");
-    gpio1 = (int) gpio1;
-    gpio2 = (int) gpio2;
-
-// TODO use this to test passing terminal commands
-//    FILE *fp = popen("su -c echo 17 > /sys/class/gpio/export", "r");
-//    FILE *fp = popen("\"id\"", "r");
-//    char buf[256];
-//    while (fgets(buf, sizeof(buf), fp) != 0) {
-//    }
-//    LOGD("%s", buf);
-//    pclose(fp);
-//    LOGD("closed");
-
 
 // TODO get system priviledges so it can set itself up
 //    setup_gpios(gpio1, gpio2);
@@ -109,11 +100,12 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     }
     /* cls is made a global to be used in the spawned thread*/
     cls = (jclass)(*env)->NewGlobalRef(env,type);
+
     struct thread_data gpios;  /* */
     gpios.gpio1 = gpio1; /* set them as the given gpio numbers */
     gpios.gpio2 = gpio2;
     pthread_t routine_thread; /*create routine thread */
-    if (pthread_create( &routine_thread, NULL, routine, (void *) &gpios)) {
+    if (pthread_create( &routine_thread, NULL, routine, NULL)) {
         LOGD("Error creating thread");
         exit(1);
     }
@@ -130,14 +122,10 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
 */
- void *routine(void *gpios){
+ void *routine(){
 
-    /* get variable from struct passed to this thread */
-    struct thread_data *my_gpios;
-    my_gpios = (struct thread_data *) gpios;
-    //TODO fix this passing of gpio #s so I don't need to hard code them
-    int gpio1 = 17;
-    int gpio2 = 22;
+    LOGD("gpi1 is %d", gpio1);
+    LOGD("gpi2 is %d", gpio2);
 
     /* get a new environment and attach this new thread to jvm */
     JNIEnv* newEnv;
@@ -184,7 +172,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         /* wait for interrupt */
         poll(pfd, 2, 1000000);
         if ((pfd[0].revents & POLLIN) | (pfd[1].revents & POLLIN)) {
-//            LOGD("interrupt received");
             /*interrupt received */
             /* consume interrupts & read values */
             if (lseek(fd1, 0, SEEK_SET) == -1) break;
@@ -193,7 +180,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
             if (read(fd2, buf2, sizeof buf2) == -1) break;
             get_direction(buf1,buf2,newEnv,obj,mid);
         }
-//        LOGD("Interrupt not received");
     }
     /* shutdown */
     LOGD("Reading Terminated");
@@ -201,7 +187,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     close(fd2);
     (*jvm)->DetachCurrentThread(jvm);
     pthread_exit(NULL);
-}
+ }
 
 /**
 * ====================================================================
@@ -328,7 +314,7 @@ int fsm(int previousState, int currentState) {
  * author(s): Stephan Greto-McGrath
  * ====================================================================
  */
-void setup_gpios(int gpio1, int gpio2){
+void setup_gpios(){
     gpio_export(gpio1);
     gpio_export(gpio2);
     set_edge(gpio1,3);
