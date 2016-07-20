@@ -136,7 +136,8 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     (*jvm)->AttachCurrentThread(jvm,&newEnv,&args);
     /* get method ID to call back to Java */
     jmethodID mid = (*newEnv)->GetMethodID(newEnv, cls, "handleStateChange", "(I)V");
-    jobject obj = (*newEnv)->NewObject(newEnv, cls, mid,(jint)1);
+    jmethodID constructor = (*newEnv)->GetMethodID(newEnv,cls,"<init>","()V");
+    jobject obj = (*newEnv)->NewObject(newEnv, cls, constructor);
 
 
     /* initialization of vars */
