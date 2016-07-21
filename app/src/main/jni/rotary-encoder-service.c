@@ -157,7 +157,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
         LOGD("failed on 2nd open");
         exit(1);
     }
-    //TODO change POLLIN to POLLPRI after testing on shitty malfunctioning device is done
+    //TODO change POLLIN to POLLPRI if device has functional sysfs gpio interface
     /* configure poll struct */
     pfd[0].fd = fd1;
     pfd[1].fd = fd2;
