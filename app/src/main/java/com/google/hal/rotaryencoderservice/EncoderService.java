@@ -78,17 +78,24 @@ public class EncoderService extends Service{
     public void handleStateChange(int direction){
         String direc;
         if (direction == 0){
-            direc = "Counter-Clockwise";
+            direc = "COUNTER_CLOCKWISE";
         }else if (direction == 1){
-            direc = "Clockwise";
+            direc = "CLOCKWISE";
         }else{
             direc = "invalid";
         }
-        showToast(direc);
+//        showToast(direc);
         Log.d(TAG, direc);
+        broadcastDirection(direc);
+
     }
 
-    //TODO write a scroll simulation method
+
+    public void broadcastDirection(String direc){
+        Intent i = new Intent();
+        i.setAction("com.google.hal." + direc);
+        MyContext.sendBroadcast(i);
+    }
 
     /* load the library for JNI functionality */
     static {
