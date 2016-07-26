@@ -1,5 +1,3 @@
-//TODO check to see app isnt uninstalled on device shutdown
-//TODO check permission for startup
 /**
 * ====================================================================
 * rotary-encoder-service.c:
@@ -66,11 +64,6 @@ bool sentinel = true;   /* indicates 1st run -> get initial (previous) state */
                         /* if state is invalid sentinel = true i.e restart */
 int currentState;
 int previousState;
-/* define arguments to pass to the thread */
-struct thread_data{
-    int gpio1;
-    int gpio2;
-};
 /* cache jvm stuff to be used in thread */
 static JavaVM *jvm;
 static jclass cls;

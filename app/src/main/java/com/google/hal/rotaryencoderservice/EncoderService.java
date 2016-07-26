@@ -64,7 +64,7 @@ public class EncoderService extends Service{
             }
         });
     }
-
+    // TODO edit this description
     /**
      * ====================================================================
      * handleStateChange method:
