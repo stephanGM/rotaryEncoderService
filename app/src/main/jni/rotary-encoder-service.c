@@ -93,10 +93,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     }
     /* cls is made a global to be used in the spawned thread*/
     cls = (jclass)(*env)->NewGlobalRef(env,type);
-
-    struct thread_data gpios;  /* */
-    gpios.gpio1 = gpio1; /* set them as the given gpio numbers */
-    gpios.gpio2 = gpio2;
     pthread_t routine_thread; /*create routine thread */
     if (pthread_create( &routine_thread, NULL, routine, NULL)) {
         LOGD("Error creating thread");
