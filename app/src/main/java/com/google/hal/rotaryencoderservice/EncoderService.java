@@ -38,7 +38,7 @@ public class EncoderService extends Service{
         MyContext = getApplicationContext(); /* get the context to use later from JNI */
         Toast.makeText(this, "GPIO Interface Running", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "onStart");
-        startRoutine(); /* call the C fn that begins the ISR thread w desired gpio pin #s */
+        startRoutine(); /* call the C fn that begins the ISR thread */
         return START_STICKY;
     }
 
@@ -64,13 +64,13 @@ public class EncoderService extends Service{
             }
         });
     }
-    // TODO edit this description
+
     /**
      * ====================================================================
      * handleStateChange method:
-     *   will call showToast to display a string indication the direction
-     *   of rotation of the rotary encoder. This method is called through
-     *   JNI once the direction is determined by the ISR
+     *   based on the direction received from the service routine running
+     *   through the C pthread, this method will set a string to append to
+     *   and intent that will be broadcast by broadcastDirection()
      * ====================================================================
      * authors(s): Stephan Greto-McGrath
      * ====================================================================
@@ -84,13 +84,21 @@ public class EncoderService extends Service{
         }else{
             direc = "invalid";
         }
-//        showToast(direc);
         Log.d(TAG, direc);
         broadcastDirection(direc);
 
     }
 
-
+    /**
+     * ====================================================================
+     * broadcastDirection method:
+     *   Pretty self-explanatory, it broadcasts an intent wil the direction
+     *   the encoder was turned in so that other apps my pick it up and
+     *   act on the input.
+     * ====================================================================
+     * authors(s): Stephan Greto-McGrath
+     * ====================================================================
+     */
     public void broadcastDirection(String direc){
         Intent i = new Intent();
         i.setAction("com.google.hal." + direc);

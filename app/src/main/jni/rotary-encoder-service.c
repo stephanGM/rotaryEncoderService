@@ -67,6 +67,7 @@ int previousState;
 /* cache jvm stuff to be used in thread */
 static JavaVM *jvm;
 static jclass cls;
+
 /**
 * ====================================================================
 * startRoutine fn:
@@ -80,7 +81,7 @@ static jclass cls;
 JNIEXPORT jint JNICALL
 Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env, jclass type) {
 
-    LOGD("function begins");
+    LOGD("encoder service started");
 
 // TODO get system priviledges so it can set itself up
 //    setup_gpios(gpio1, gpio2);
@@ -112,10 +113,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 * ====================================================================
 */
  void *routine(){
-
-    LOGD("gpi1 is %d", gpio1);
-    LOGD("gpi2 is %d", gpio2);
-
     /* get a new environment and attach this new thread to jvm */
     JNIEnv* newEnv;
     JavaVMAttachArgs args;
@@ -127,7 +124,6 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
     jmethodID mid = (*newEnv)->GetMethodID(newEnv, cls, "handleStateChange", "(I)V");
     jmethodID construct = (*newEnv)->GetMethodID(newEnv,cls,"<init>","()V");
     jobject obj = (*newEnv)->NewObject(newEnv, cls, construct);
-
 
     /* initialization of vars */
     struct pollfd pfd[2];
@@ -160,7 +156,7 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 
     for (;;) {
         /* wait for interrupt */
-        poll(pfd, 2, 1000000);
+        poll(pfd, 2, 1); // TODO if POLLPRI change to poll(pfd, 2, -1)
         if ((pfd[0].revents & POLLIN) | (pfd[1].revents & POLLIN)) {
             /*interrupt received */
             /* consume interrupts & read values */
@@ -183,7 +179,9 @@ Java_com_google_hal_rotaryencoderservice_EncoderService_startRoutine(JNIEnv *env
 * ====================================================================
 * get_direction fn:
 *   assigns state based on sentinel var and calls the fsm to determine
-*   direction
+*   direction. This function calls back to Java with an int
+*   (direction) which will allow java to broadcast the input to other
+*   apps.
 * ====================================================================
 * authors(s): Stephan Greto-McGrath
 * ====================================================================
@@ -199,11 +197,10 @@ void get_direction(char buf1[8], char buf2[8], JNIEnv *newEnv, jobject obj, jmet
         if (previousState != currentState) {
             int direction = fsm(currentState, previousState);
             LOGD("direction: %d\n", direction);
-            (*newEnv)->CallVoidMethod(newEnv, obj, mid, (jint)direction); /* call back to java */
-                                                                    /* act on state change */
+            /* call back to java to broadcast state change*/
+            (*newEnv)->CallVoidMethod(newEnv, obj, mid, (jint)direction);
         }
     } else { /* just starting -> need prev state */
-
         currentState = concantenate(atoi(buf1), atoi(buf2));
         sentinel = false;
     }
@@ -358,22 +355,22 @@ static int set_edge(int pin, int edge){
     switch (edge) {
         case (1):
             if(write(fd, "rising", 6*sizeof(char))<0){
-                LOGD("write during gpio export failed");
+                LOGD("write during set_edge failed");
                 return(-1);
             }
         case (2):
             if(write(fd, "falling", 7*sizeof(char))<0){
-                LOGD("write during gpio export failed");
+                LOGD("write during set_edge failed");
                 return(-1);
             }
         case (3):
             if(write(fd, "both", 4*sizeof(char))<0){
-                LOGD("write during gpio export failed");
+                LOGD("write during set_edge failed");
                 return(-1);
             }
         default:
             if(write(fd, "both", 4*sizeof(char))<0){
-                LOGD("write during gpio export failed");
+                LOGD("write during set_edge failed");
                 return(-1);
             }
     }
