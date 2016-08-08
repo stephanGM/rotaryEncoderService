@@ -46,6 +46,8 @@ public class EncoderService extends Service{
      * ====================================================================
      * showToast method:
      *   Used to display Toast messages using Boast and from worker threads
+     *   Can be used for debugging to display toasts from
+     *   handleStateChange()
      * ====================================================================
      * Details:
      *   uses a handler in order to make Toast/Boast possible from worker
@@ -86,7 +88,6 @@ public class EncoderService extends Service{
         }
         Log.d(TAG, direc);
         broadcastDirection(direc);
-
     }
 
     /**
